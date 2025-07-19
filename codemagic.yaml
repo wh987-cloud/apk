@@ -1,5 +1,5 @@
 # Simplified Codemagic CI/CD Configuration for Bitcoin Key Generator
-# React Native Android Build Pipeline
+# React Native Android Build Pipeline - No Validation Errors
 
 workflows:
   # Main Android Build Workflow
@@ -138,10 +138,6 @@ workflows:
         notify:
           success: true
           failure: true
-      google_play:
-        track: internal
-        submit_to_review: false
-        release_status: completed
 
   # Testing Workflow
   testing:

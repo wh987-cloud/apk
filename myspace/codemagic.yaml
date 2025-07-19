@@ -1,0 +1,301 @@
+# Simplified Codemagic CI/CD Configuration for Bitcoin Key Generator
+# React Native Android Build Pipeline
+
+workflows:
+  # Main Android Build Workflow
+  android-build:
+    name: "Bitcoin Key Generator - Android Build"
+    environment:
+      node: 18
+      android_signing:
+        - keystore_reference
+      vars:
+        PACKAGE_NAME: "com.bitcoinkeygenerator"
+        GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+        JAVA_OPTS: "-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError"
+      groups:
+        - google_play
+        - codemagic_license
+    scripts:
+      - name: "Setup Environment"
+        script: |
+          echo "🚀 Starting Bitcoin Key Generator Android Build"
+          echo "Node.js version: $(node --version)"
+          echo "npm version: $(npm --version)"
+          
+          # Install React Native CLI
+          npm install -g @react-native-community/cli
+          
+          # Setup Android environment
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          export PATH=$PATH:$ANDROID_HOME/emulator
+          export PATH=$PATH:$ANDROID_HOME/tools
+          export PATH=$PATH:$ANDROID_HOME/tools/bin
+          export PATH=$PATH:$ANDROID_HOME/platform-tools
+          
+          echo "Android SDK: $ANDROID_HOME"
+          adb --version
+      
+      - name: "Install Dependencies"
+        script: |
+          echo "📦 Installing dependencies..."
+          npm ci
+          
+          # Install Android dependencies
+          cd android
+          ./gradlew dependencies
+          cd ..
+      
+      - name: "Setup Code Signing"
+        script: |
+          echo "🔐 Setting up code signing..."
+          
+          # Create debug keystore for development builds
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keypass android \
+            -keystore android/app/debug.keystore \
+            -storepass android \
+            -dname "CN=Bitcoin Key Generator Debug,O=Development,C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+          
+          echo "✅ Debug keystore created"
+      
+      - name: "Build Android APK"
+        script: |
+          echo "🔨 Building Android APK..."
+          
+          # Clean previous builds
+          cd android
+          ./gradlew clean
+          
+          # Build debug APK
+          echo "Building debug APK..."
+          ./gradlew assembleDebug
+          
+          # Build release APK
+          echo "Building release APK..."
+          ./gradlew assembleRelease
+          
+          cd ..
+          
+          # Verify APK generation
+          echo "📱 Generated APK files:"
+          find android/app/build/outputs/apk -name "*.apk" -type f -exec ls -la {} \;
+      
+      - name: "Build App Bundle"
+        script: |
+          echo "📦 Building Android App Bundle..."
+          cd android
+          ./gradlew bundleRelease
+          cd ..
+          
+          echo "✅ App Bundle generated"
+      
+      - name: "Verify Builds"
+        script: |
+          echo "✅ Verifying builds..."
+          
+          # Check debug APK
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "✅ Debug APK: $(ls -lh android/app/build/outputs/apk/debug/app-debug.apk)"
+          else
+            echo "❌ Debug APK not found"
+            exit 1
+          fi
+          
+          # Check release APK
+          if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+            echo "✅ Release APK: $(ls -lh android/app/build/outputs/apk/release/app-release.apk)"
+          else
+            echo "❌ Release APK not found"
+            exit 1
+          fi
+          
+          # Check App Bundle
+          if [ -f "android/app/build/outputs/bundle/release/app-release.aab" ]; then
+            echo "✅ App Bundle: $(ls -lh android/app/build/outputs/bundle/release/app-release.aab)"
+          else
+            echo "❌ App Bundle not found"
+            exit 1
+          fi
+          
+          echo "🎉 All builds completed successfully!"
+    
+    artifacts:
+      - android/app/build/outputs/apk/debug/app-debug.apk
+      - android/app/build/outputs/apk/release/app-release.apk
+      - android/app/build/outputs/bundle/release/app-release.aab
+      - build/**/outputs/**/*.apk
+      - build/**/outputs/**/mapping.txt
+    
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+      google_play:
+        track: internal
+        submit_to_review: false
+        release_status: completed
+
+  # Testing Workflow
+  testing:
+    name: "Bitcoin Key Generator - Testing"
+    environment:
+      node: 18
+      vars:
+        PACKAGE_NAME: "com.bitcoinkeygenerator"
+    scripts:
+      - name: "Setup Testing Environment"
+        script: |
+          echo "🧪 Setting up testing environment..."
+          node --version
+          npm --version
+      
+      - name: "Install Dependencies"
+        script: |
+          echo "📦 Installing dependencies..."
+          npm ci
+      
+      - name: "Run Tests"
+        script: |
+          echo "🧪 Running tests..."
+          
+          # Run JavaScript tests
+          npm test
+          
+          # Run linting
+          npm run lint
+          
+          # Security audit
+          npm audit --audit-level moderate
+          
+          echo "✅ All tests passed!"
+    
+    artifacts:
+      - test-results/**/*.xml
+      - coverage/**/*
+    
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+
+  # Development Build Workflow
+  development:
+    name: "Bitcoin Key Generator - Development Build"
+    environment:
+      node: 18
+      android_signing:
+        - keystore_reference
+      vars:
+        PACKAGE_NAME: "com.bitcoinkeygenerator"
+        BUILD_TYPE: "debug"
+    scripts:
+      - name: "Setup Development Environment"
+        script: |
+          echo "🔧 Setting up development build environment..."
+          node --version
+          npm --version
+      
+      - name: "Install Dependencies"
+        script: |
+          echo "📦 Installing dependencies..."
+          npm ci
+      
+      - name: "Build Development APK"
+        script: |
+          echo "🔨 Building development APK..."
+          
+          # Setup debug keystore
+          keytool -genkeypair \
+            -alias androiddebugkey \
+            -keypass android \
+            -keystore android/app/debug.keystore \
+            -storepass android \
+            -dname "CN=Bitcoin Key Generator Debug,O=Development,C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+          
+          # Build debug APK
+          cd android
+          ./gradlew clean
+          ./gradlew assembleDebug
+          cd ..
+          
+          echo "✅ Development APK built successfully"
+          ls -la android/app/build/outputs/apk/debug/
+    
+    artifacts:
+      - android/app/build/outputs/apk/debug/app-debug.apk
+    
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+
+# Global Configuration
+global:
+  environment:
+    flutter: stable
+    xcode: latest
+    cocoapods: default
+  vars:
+    GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.configureondemand=true"
+    JAVA_OPTS: "-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+  groups:
+    - google_play
+    - codemagic_license
+
+# Trigger Configuration
+triggering:
+  events:
+    - push
+    - pull_request
+    - tag
+  branch_patterns:
+    - pattern: 'main'
+      include: true
+      source: true
+    - pattern: 'develop'
+      include: true
+      source: true
+    - pattern: 'feature/*'
+      include: true
+      source: true
+  tag_patterns:
+    - pattern: 'v*'
+      include: true
+      source: true
+
+# Notifications
+notifications:
+  email:
+    recipients:
+      - your-email@example.com
+  slack:
+    webhook_url: $SLACK_WEBHOOK_URL
+    channel: '#bitcoin-key-generator'
+
+# Build Settings
+build_timeout: 45
+
+# Cache Configuration
+cache:
+  paths:
+    - ~/.npm
+    - ~/.gradle
+    - node_modules
+    - android/.gradle 

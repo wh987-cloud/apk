@@ -1,21 +1,16 @@
-# Simplified Codemagic CI/CD Configuration for Bitcoin Key Generator
-# React Native Android Build Pipeline - No Validation Errors
+# Minimal Codemagic CI/CD Configuration for Bitcoin Key Generator
+# No pre-configuration required - Ready to use immediately
 
 workflows:
-  # Main Android Build Workflow
+  # Simple Android Build Workflow
   android-build:
     name: "Bitcoin Key Generator - Android Build"
     environment:
       node: 18
-      android_signing:
-        - keystore_reference
       vars:
         PACKAGE_NAME: "com.bitcoinkeygenerator"
         GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
         JAVA_OPTS: "-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError"
-      groups:
-        - google_play
-        - codemagic_license
     scripts:
       - name: "Setup Environment"
         script: |
@@ -46,9 +41,9 @@ workflows:
           ./gradlew dependencies
           cd ..
       
-      - name: "Setup Code Signing"
+      - name: "Setup Debug Keystore"
         script: |
-          echo "🔐 Setting up code signing..."
+          echo "🔐 Setting up debug keystore..."
           
           # Create debug keystore for development builds
           keytool -genkeypair \
@@ -75,7 +70,7 @@ workflows:
           echo "Building debug APK..."
           ./gradlew assembleDebug
           
-          # Build release APK
+          # Build release APK (with debug signing)
           echo "Building release APK..."
           ./gradlew assembleRelease
           
@@ -185,63 +180,6 @@ workflows:
           success: true
           failure: true
 
-  # Development Build Workflow
-  development:
-    name: "Bitcoin Key Generator - Development Build"
-    environment:
-      node: 18
-      android_signing:
-        - keystore_reference
-      vars:
-        PACKAGE_NAME: "com.bitcoinkeygenerator"
-        BUILD_TYPE: "debug"
-    scripts:
-      - name: "Setup Development Environment"
-        script: |
-          echo "🔧 Setting up development build environment..."
-          node --version
-          npm --version
-      
-      - name: "Install Dependencies"
-        script: |
-          echo "📦 Installing dependencies..."
-          npm ci
-      
-      - name: "Build Development APK"
-        script: |
-          echo "🔨 Building development APK..."
-          
-          # Setup debug keystore
-          keytool -genkeypair \
-            -alias androiddebugkey \
-            -keypass android \
-            -keystore android/app/debug.keystore \
-            -storepass android \
-            -dname "CN=Bitcoin Key Generator Debug,O=Development,C=US" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
-          
-          # Build debug APK
-          cd android
-          ./gradlew clean
-          ./gradlew assembleDebug
-          cd ..
-          
-          echo "✅ Development APK built successfully"
-          ls -la android/app/build/outputs/apk/debug/
-    
-    artifacts:
-      - android/app/build/outputs/apk/debug/app-debug.apk
-    
-    publishing:
-      email:
-        recipients:
-          - your-email@example.com
-        notify:
-          success: true
-          failure: true
-
 # Global Configuration
 global:
   environment:
@@ -251,9 +189,6 @@ global:
   vars:
     GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.configureondemand=true"
     JAVA_OPTS: "-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
-  groups:
-    - google_play
-    - codemagic_license
 
 # Trigger Configuration
 triggering:
@@ -281,9 +216,6 @@ notifications:
   email:
     recipients:
       - your-email@example.com
-  slack:
-    webhook_url: $SLACK_WEBHOOK_URL
-    channel: '#bitcoin-key-generator'
 
 # Build Settings
 build_timeout: 45
